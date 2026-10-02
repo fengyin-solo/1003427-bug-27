@@ -24,6 +24,18 @@
       </span>
     </p>
 
+    <section class="attention-panel" data-panel="attention">
+      <h3>关注事项（{{ attention.length }}）</h3>
+      <ul v-if="attention.length">
+        <li v-for="item in attention" :key="item.id">
+          <strong>{{ item.title }}</strong>
+          <span>{{ item.detail }}</span>
+          <em>{{ item.operator }} · {{ formatTime(item.createdAt) }}</em>
+        </li>
+      </ul>
+      <p v-else class="attention-empty">暂无关注事项，气象观测异常值改判入库后会同步到这里</p>
+    </section>
+
     <form class="filter-bar" @submit.prevent="reload">
       <label v-for="field in filterFields" :key="field" class="filter-item">
         <span>{{ field }}</span>
@@ -75,11 +87,12 @@ import { computed, onMounted, ref } from 'vue'
 
 import {
   downloadEntries,
+  listAttentionItems,
   listEntries,
   moduleMeta,
   runAction as applyAction,
 } from '@/api/local-service'
-import type { EntryRow } from '@/data/types'
+import type { AttentionItem, EntryRow } from '@/data/types'
 
 const meta = moduleMeta('firewatch')
 const columns = ["监测点编号", "监测区域", "火险等级", "风力等级", "相对湿度", "气温读数", "监测时间", "监测状态"]
@@ -91,6 +104,8 @@ const rows = ref<EntryRow[]>([])
 const total = ref(0)
 const errorMessage = ref('')
 const filters = ref<Record<string, string>>({})
+// 关注事项：其他模块（气象观测改判）同步过来的待关注记录，随列表一起刷新
+const attention = ref<AttentionItem[]>([])
 const filterFields = columns.slice(0, 3)
 const statusSummary = computed(() =>
   statuses.map((status: string) => ({
@@ -128,9 +143,15 @@ function reload() {
     const payload = listEntries(meta.key, filters.value)
     rows.value = payload.items
     total.value = payload.total
+    attention.value = listAttentionItems()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '火险监测列表读取失败'
   }
+}
+
+function formatTime(iso: string) {
+  const time = new Date(iso)
+  return Number.isNaN(time.getTime()) ? iso : time.toLocaleString('zh-CN')
 }
 
 onMounted(reload)
